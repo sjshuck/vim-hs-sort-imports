@@ -1,21 +1,29 @@
+-- Projection for total ordering of parenthesized import items
 local function item_type(item)
     if string.find("^type ", item) then
+        -- Type operator
         return 1
     elseif string.find("^[A-Z]", item) then
+        -- Type
         return 2
     elseif string.find("^%(", item) then
+        -- Operator
         return 3
     else
+        -- Function
         return 4
     end
 end
 
+-- Mutate the table of lines to do all the actual work of the plugin
 local function rearrange_lines(lines)
     local cur_range = nil
     local last_i
     local import_ranges = {}
 
+    -- Parse each line as potentially an import statement
     for i, line in ipairs(lines) do
+        -- Split on spaces
         local words = {}
         for word in string.gmatch(line, "%S+") do
             table.insert(words, word)
@@ -25,6 +33,9 @@ local function rearrange_lines(lines)
             goto continue
         end
 
+        -- If the first line of a contiguous chunk of import statements,
+        -- collect parsed line info into a new chunk table, else add to the
+        -- current chunk table.
         local v = {}
         if cur_range == nil or last_i + 1 < i then
             cur_range = {first_i = i, vs = {}}
@@ -40,18 +51,22 @@ local function rearrange_lines(lines)
 
         v.module = table.remove(words, 1)
 
+        -- Anything after the module name
         local after_module = table.concat(words, " ")
         if after_module == "" then
             goto continue
         end
 
+        -- Try to isolate parenthesized, comma-separated list of items
         local to_open_parens, in_parens, from_close_parens =
             string.match(after_module, "([^(]*%()(.*)(%).*)")
         if not in_parens then
+            -- No list of items
             v.after_module = after_module
             goto continue
         end
 
+        -- Yes list of items.  Sort it
         local items = {}
         for item in string.gmatch(in_parens, "([^,]+),? *") do
             table.insert(items, item)
@@ -75,7 +90,9 @@ local function rearrange_lines(lines)
         ::continue::
     end
 
+    -- Individually sort every chunk of import statements
     for _, range in ipairs(import_ranges) do
+        -- First by module, then by non-qualified-ness
         table.sort(range.vs, function(v1, v2)
             if v1.module < v2.module then
                 return true
@@ -85,6 +102,7 @@ local function rearrange_lines(lines)
             return not v1.qualified and v2.qualified
         end)
 
+        -- Determine widths of columns
         local any_qualified = false
         local max_module_len = 0
         for _, v in ipairs(range.vs) do
@@ -92,6 +110,7 @@ local function rearrange_lines(lines)
             max_module_len = math.max(max_module_len, #v.module)
         end
 
+        -- Render lines in columnar format
         for i, v in ipairs(range.vs) do
             local words = {"import "}
             if any_qualified then
@@ -107,6 +126,7 @@ local function rearrange_lines(lines)
                 table.insert(words, v.after_module)
             end
 
+            -- Save
             lines[range.first_i + i - 1] = table.concat(words)
         end
     end
@@ -122,6 +142,7 @@ local function hs_sort_imports()
     vim.api.nvim_buf_set_lines(buf, 0, -1, true, lines)
 end
 
+-- Export
 return {
     hs_sort_imports = hs_sort_imports
 }
