@@ -1,4 +1,4 @@
--- Projection for total ordering of parenthesized import items
+-- Projection for partial ordering of parenthesized import items
 local function item_type(item)
     if string.find("^type ", item) then
         -- Type operator
@@ -17,9 +17,9 @@ end
 
 -- Mutate the table of lines to do all the actual work of the plugin
 local function rearrange_lines(lines)
-    local cur_range = nil
+    local cur_chunk = nil
     local last_i
-    local import_ranges = {}
+    local chunks = {}
 
     -- Parse each line as potentially an import statement
     for i, line in ipairs(lines) do
@@ -37,12 +37,15 @@ local function rearrange_lines(lines)
         -- collect parsed line info into a new chunk table, else add to the
         -- current chunk table.
         local v = {}
-        if cur_range == nil or last_i + 1 < i then
-            cur_range = {first_i = i, vs = {}}
-            table.insert(import_ranges, cur_range)
+        if cur_chunk == nil or last_i + 1 < i then
+            cur_chunk = {
+                first_i = i,
+                vs = {},
+            }
+            table.insert(chunks, cur_chunk)
         end
         last_i = i
-        table.insert(cur_range.vs, v)
+        table.insert(cur_chunk.vs, v)
 
         if words[1] == "qualified" then
             table.remove(words, 1)
@@ -91,9 +94,9 @@ local function rearrange_lines(lines)
     end
 
     -- Individually sort every chunk of import statements
-    for _, range in ipairs(import_ranges) do
+    for _, chunk in ipairs(chunks) do
         -- First by module, then by non-qualified-ness
-        table.sort(range.vs, function(v1, v2)
+        table.sort(chunk.vs, function(v1, v2)
             if v1.module < v2.module then
                 return true
             elseif v1.module > v2.module then
@@ -105,13 +108,13 @@ local function rearrange_lines(lines)
         -- Determine widths of columns
         local any_qualified = false
         local max_module_len = 0
-        for _, v in ipairs(range.vs) do
+        for _, v in ipairs(chunk.vs) do
             any_qualified = any_qualified or v.qualified
             max_module_len = math.max(max_module_len, #v.module)
         end
 
         -- Render lines in columnar format
-        for i, v in ipairs(range.vs) do
+        for i, v in ipairs(chunk.vs) do
             local words = {"import "}
             if any_qualified then
                 local qual_col = v.qualified and
@@ -127,7 +130,7 @@ local function rearrange_lines(lines)
             end
 
             -- Save
-            lines[range.first_i + i - 1] = table.concat(words)
+            lines[chunk.first_i + i - 1] = table.concat(words)
         end
     end
 end
