@@ -36,7 +36,7 @@ local function rearrange_lines(lines)
         -- If the first line of a contiguous chunk of import statements,
         -- collect parsed line info into a new chunk table, else add to the
         -- current chunk table.
-        local v = {}
+        local parsed = {}
         if cur_chunk == nil or last_i + 1 < i then
             cur_chunk = {
                 first_i = i,
@@ -45,27 +45,27 @@ local function rearrange_lines(lines)
             table.insert(chunks, cur_chunk)
         end
         last_i = i
-        table.insert(cur_chunk.vs, v)
+        table.insert(cur_chunk.vs, parsed)
 
         if words[1] == "qualified" then
             table.remove(words, 1)
-            v.qualified = true
+            parsed.qualified = true
         end
 
-        v.module = table.remove(words, 1)
+        parsed.module = table.remove(words, 1)
 
         -- Anything after the module name
-        local after_module = table.concat(words, " ")
-        if after_module == "" then
+        if #words == 0 then
             goto continue
         end
+        local after_module = table.concat(words, " ")
 
         -- Try to isolate parenthesized, comma-separated list of items
         local to_open_parens, in_parens, from_close_parens =
             string.match(after_module, "([^(]*%()(.*)(%).*)")
         if not in_parens then
             -- No list of items
-            v.after_module = after_module
+            parsed.after_module = after_module
             goto continue
         end
 
@@ -84,7 +84,7 @@ local function rearrange_lines(lines)
             return item1 < item2
         end)
 
-        v.after_module = table.concat {
+        parsed.after_module = table.concat {
             to_open_parens,
             table.concat(items, ", "),
             from_close_parens,
@@ -108,29 +108,28 @@ local function rearrange_lines(lines)
         -- Determine widths of columns
         local any_qualified = false
         local max_module_len = 0
-        for _, v in ipairs(chunk.vs) do
-            any_qualified = any_qualified or v.qualified
-            max_module_len = math.max(max_module_len, #v.module)
+        for _, parsed in ipairs(chunk.vs) do
+            any_qualified = any_qualified or parsed.qualified
+            max_module_len = math.max(max_module_len, #parsed.module)
         end
 
         -- Render lines in columnar format
-        for i, v in ipairs(chunk.vs) do
-            local words = {"import "}
+        for i, parsed in ipairs(chunk.vs) do
+            local cols = {"import"}
             if any_qualified then
-                local qual_col = v.qualified and
-                    "qualified " or
-                    "          "
-                table.insert(words, qual_col)
+                local qual_col = parsed.qualified and
+                    "qualified" or
+                    "         "
+                table.insert(cols, qual_col)
             end
-            table.insert(words, v.module)
-            if v.after_module then
-                local num_spaces = max_module_len - #v.module + 1
-                table.insert(words, string.rep(' ', num_spaces))
-                table.insert(words, v.after_module)
+            table.insert(cols, parsed.module)
+            if parsed.after_module then
+                local spaces = string.rep(" ", max_module_len - #parsed.module)
+                table.insert(cols, spaces .. parsed.after_module)
             end
 
             -- Save
-            lines[chunk.first_i + i - 1] = table.concat(words)
+            lines[chunk.first_i + i - 1] = table.concat(cols, " ")
         end
     end
 end
