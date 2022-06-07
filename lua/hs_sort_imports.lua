@@ -1,12 +1,12 @@
 -- Projection for partial ordering of parenthesized import items
 local function item_type(item)
-    if string.find("^type ", item) then
+    if string.find(item, "^type ") then
         -- Type operator
         return 1
-    elseif string.find("^[A-Z]", item) then
+    elseif string.find(item, "^[A-Z]") then
         -- Type
         return 2
-    elseif string.find("^%(", item) then
+    elseif string.find(item, "^%(") then
         -- Operator
         return 3
     else
