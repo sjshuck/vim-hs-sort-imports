@@ -28,7 +28,7 @@ local handlers = {
                 table.insert(words, word)
             end
 
-            if words[1] ~= "{-#" or words[#words] ~= "#-}" or not words[2] then
+            if #words < 3 or words[1] ~= "{-#" or words[#words] ~= "#-}" then
                 return nil
             end
 
