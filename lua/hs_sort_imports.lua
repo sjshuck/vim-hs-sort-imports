@@ -16,8 +16,7 @@ local function item_type(item)
 end
 
 local handlers = {
-    -- Pragma
-    {
+    pragma = {
         parse = function(line)
             if not string.find(line, "^%S") then
                 return nil
@@ -41,8 +40,7 @@ local handlers = {
         sort = table.sort,
     },
 
-    -- Import
-    {
+    import = {
         parse = function(line)
             if not string.find(line, "^%S") then
                 return nil
@@ -148,43 +146,44 @@ local handlers = {
 }
 
 -- Returns a function that when called gets the next tuple
---     (parsed data, sort function for that type of data)
+--     (parsed data, type of data)
 local function parse_lines(lines)
     return coroutine.wrap(function()
         for _, line in ipairs(lines) do
             -- An unparsable line will yield (the line, nil)
-            local v, sort = line, nil
+            local v, v_type = line, nil
 
-            for _, handler in ipairs(handlers) do
+            for handler_name, handler in pairs(handlers) do
                 local parsed = handler.parse(line)
                 if parsed then
-                    v, sort = parsed, handler.sort
+                    v, v_type = parsed, handler_name
                     break
                 end
             end
 
-            coroutine.yield(v, sort)
+            coroutine.yield(v, v_type)
         end
     end)
 end
 
 -- A chunk is a table of contiguous parsed lines of the same type, tagged with
--- the sort method that will be called on it.
-local function chunks_and_lines(vs_with_sorts)
+-- the name of the handler that parsed it and will sort it.
+local function chunks_and_lines(vs_with_types)
     return coroutine.wrap(function()
         local chunk = {}
 
-        for v, sort in vs_with_sorts do
-            if #chunk > 0 and sort ~= chunk.sort then
+        for v, v_type in vs_with_types do
+            if #chunk > 0 and v_type ~= chunk.type then
                 -- End of chunk
                 coroutine.yield(chunk)
                 chunk = {}
             end
 
-            if sort then
+            if v_type then
                 if #chunk == 0 then
                     -- Beginning of chunk
-                    chunk.sort = sort
+                    chunk.type = v_type
+                    chunk.sort = handlers[v_type].sort
                 end
                 table.insert(chunk, v)
             else
