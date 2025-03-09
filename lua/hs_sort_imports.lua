@@ -86,12 +86,10 @@ local handlers = {
             table.sort(items, function(item1, item2)
                 local item1_type = item_type(item1)
                 local item2_type = item_type(item2)
-                if item1_type < item2_type then
-                    return true
-                elseif item1_type > item2_type then
-                    return false
-                else
+                if item1_type == item2_type then
                     return item1 < item2
+                else
+                    return item1_type < item2_type
                 end
             end)
 
@@ -107,12 +105,10 @@ local handlers = {
         sort = function(chunk)
             -- First by module, then by non-qualified-ness
             table.sort(chunk, function(v1, v2)
-                if v1.module < v2.module then
-                    return true
-                elseif v1.module > v2.module then
-                    return false
-                else
+                if v1.module == v2.module then
                     return not v1.qualified and v2.qualified
+                else
+                    return v1.module < v2.module
                 end
             end)
 
